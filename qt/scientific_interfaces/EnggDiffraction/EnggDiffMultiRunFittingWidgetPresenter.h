@@ -22,7 +22,7 @@ public:
   void addFittedPeaks(const RunLabel &runLabel,
                       const Mantid::API::MatrixWorkspace_sptr ws) override;
 
-  void addFocusedRun(const Mantid::API::MatrixWorkspace_sptr ws) override;
+  RunLabel addFocusedRun(const Mantid::API::MatrixWorkspace_sptr ws) override;
 
   boost::optional<Mantid::API::MatrixWorkspace_sptr>
   getFittedPeaks(const RunLabel &runLabel) const override;

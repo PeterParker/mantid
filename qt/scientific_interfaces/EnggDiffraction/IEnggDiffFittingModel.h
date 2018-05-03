@@ -18,11 +18,18 @@ class IEnggDiffFittingModel {
 public:
   virtual ~IEnggDiffFittingModel() = default;
 
-  virtual Mantid::API::MatrixWorkspace_sptr
-  getFocusedWorkspace(const RunLabel &runLabel) const = 0;
+  virtual void addFilename(const RunLabel &runLabel,
+                           const std::string &filename) = 0;
+
+  virtual void addFocusedRun(const RunLabel &runLabel,
+                             const Mantid::API::MatrixWorkspace_sptr ws) = 0;
 
   virtual Mantid::API::MatrixWorkspace_sptr
-  getAlignedWorkspace(const RunLabel &runLabel) const = 0;
+  alignDetectors(const Mantid::API::MatrixWorkspace_sptr inputWS,
+                 const std::string &outputWSName) = 0;
+
+  virtual Mantid::API::MatrixWorkspace_sptr
+  getFocusedWorkspace(const RunLabel &runLabel) const = 0;
 
   virtual Mantid::API::MatrixWorkspace_sptr
   getFittedPeaksWS(const RunLabel &runLabel) const = 0;
@@ -35,23 +42,22 @@ public:
 
   virtual void removeRun(const RunLabel &runLabel) = 0;
 
-  virtual void loadWorkspaces(const std::string &filenames) = 0;
+  virtual Mantid::API::MatrixWorkspace_sptr
+  loadWorkspace(const std::string &filename) = 0;
 
   virtual std::vector<RunLabel> getRunLabels() const = 0;
 
   virtual void
-  setDifcTzero(const RunLabel &runLabel,
+  setDifcTzero(Mantid::API::MatrixWorkspace_sptr ws, const RunLabel &runLabel,
                const std::vector<GSASCalibrationParms> &calibParams) = 0;
 
-  virtual void enggFitPeaks(const RunLabel &runLabel,
-                            const std::string &expectedPeaks) = 0;
+  virtual Mantid::API::MatrixWorkspace_sptr
+  enggFitPeaks(const RunLabel &runLabel,
+               const Mantid::API::MatrixWorkspace_sptr inputWS,
+               const std::string &expectedPeaks) = 0;
 
   virtual void saveDiffFittingAscii(const RunLabel &runLabel,
                                     const std::string &filename) const = 0;
-
-  virtual void createFittedPeaksWS(const RunLabel &runLabel) = 0;
-
-  virtual size_t getNumFocusedWorkspaces() const = 0;
 
   virtual void addAllFitResultsToADS() const = 0;
 

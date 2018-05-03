@@ -37,8 +37,10 @@ public:
    Add a focused run to the widget. The run should be added to the list and
    plotting it should be possible
    @param ws The workspace to add
+   @return Run number and bank ID assigned to the run
   */
-  virtual void addFocusedRun(const Mantid::API::MatrixWorkspace_sptr ws) = 0;
+  virtual RunLabel
+  addFocusedRun(const Mantid::API::MatrixWorkspace_sptr ws) = 0;
 
   /**
    Get fitted peaks workspace corresponding to a given run and bank, if a fit

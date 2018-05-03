@@ -5,6 +5,8 @@
 #include "DllConfig.h"
 #include "IEnggDiffFittingPresenter.h"
 #include "IEnggDiffFittingView.h"
+#include "IEnggDiffMultiRunFittingWidgetView.h"
+#include "IEnggDiffractionPythonRunner.h"
 
 #include "ui_EnggDiffractionQtTabFitting.h"
 
@@ -62,8 +64,10 @@ public:
       boost::shared_ptr<IEnggDiffractionSettings> mainSettings,
       boost::shared_ptr<IEnggDiffractionCalibration> mainCalib,
       boost::shared_ptr<IEnggDiffractionParam> mainParam,
-      boost::shared_ptr<IEnggDiffractionPythonRunner> mainPyhonRunner);
+      boost::shared_ptr<IEnggDiffractionPythonRunner> pythonRunner);
   ~EnggDiffFittingViewQtWidget() override;
+
+  void addWidget(IEnggDiffMultiRunFittingWidgetView *widget) override;
 
   /// From the IEnggDiffractionUserMsg interface
   void showStatus(const std::string &sts) override;
@@ -80,9 +84,6 @@ public:
 
   std::string focusingDir() const override;
 
-  /// From the IEnggDiffractionPythonRunner interface
-  virtual std::string enggRunPythonCode(const std::string &pyCode) override;
-
   void enable(bool enable);
 
   std::vector<std::string> logMsgs() const override { return m_logMsgs; }
@@ -93,32 +94,9 @@ public:
 
   void enableFitAllButton(bool enable) const override;
 
-  void clearFittingListWidget() const override;
-
-  void enableFittingListWidget(bool enable) const override;
-
-  int getFittingListWidgetCurrentRow() const override;
-
-  boost::optional<std::string>
-  getFittingListWidgetCurrentValue() const override;
-
-  bool listWidgetHasSelectedRow() const override;
-
-  void updateFittingListWidget(const std::vector<std::string> &rows) override;
-
-  void setFittingListWidgetCurrentRow(int idx) const override;
-
   std::string getExpectedPeaksInput() const override;
 
   void setPeakList(const std::string &peakList) const override;
-
-  void resetCanvas() override;
-
-  void setDataVector(std::vector<boost::shared_ptr<QwtData>> &data,
-                     bool focused, bool plotSinglePeaks,
-                     const std::string &xAxisLabel) override;
-
-  void addRunNoItem(std::string runNo) override;
 
   std::vector<std::string> getFittingRunNumVec() override;
 
@@ -132,10 +110,6 @@ public:
 
   void setFittingSingleRunMode(bool mode) override;
 
-  double getPeakCentre() const override;
-
-  bool peakPickerEnabled() const override;
-
   std::string getPreviousDir() const override;
 
   void setPreviousDir(const std::string &path) override;
@@ -144,24 +118,11 @@ public:
 
   std::string getSaveFile(const std::string &prevPath) override;
 
-  void dataCurvesFactory(std::vector<boost::shared_ptr<QwtData>> &data,
-                         std::vector<QwtPlotCurve *> &dataVector, bool focused);
-
-  void setPeakPickerEnabled(bool enabled);
-
-  void setPeakPicker(const Mantid::API::IPeakFunction_const_sptr &peak);
-
-  void setZoomTool(bool enabled);
-
-  void resetView();
-
   std::string getCurrentInstrument() const override { return m_currentInst; }
 
   void setCurrentInstrument(const std::string &newInstrument) override {
     m_currentInst = newInstrument;
   }
-
-  bool plotFittedPeaksEnabled() const override;
 
 protected:
   void initLayout();
@@ -174,7 +135,6 @@ private slots:
   // slot of the fitting peaks per part of the interface
   void browseFitFocusedRun();
   void resetFittingMode();
-  void setPeakPick();
   void clearPeakList();
   void loadClicked();
   void fitClicked();
@@ -182,11 +142,7 @@ private slots:
   void addClicked();
   void browseClicked();
   void saveClicked();
-  void plotSeparateWindow();
   void showToolTipHelp();
-  void listWidget_fitting_run_num_clicked(QListWidgetItem *listWidget);
-  void plotFittedPeaksStateChanged();
-  void removeRunClicked();
 
 private:
   /// Setup the interface (tab UI)
@@ -220,26 +176,13 @@ private:
   // here the view puts messages before notifying the presenter to show them
   std::vector<std::string> m_logMsgs;
 
-  /// Loaded focused workspace
-  std::vector<QwtPlotCurve *> m_focusedDataVector;
-
-  /// Loaded data curves
-  std::vector<QwtPlotCurve *> m_fittedDataVector;
-
-  /// Peak picker tool for fitting - only one on the plot at any given moment
-  MantidWidgets::PeakPicker *m_peakPicker = nullptr;
-
-  /// zoom-in/zoom-out tool for fitting
-  QwtPlotZoomer *m_zoomTool = nullptr;
-
   /// user messages interface provided by a main view/widget
   boost::shared_ptr<IEnggDiffractionUserMsg> m_mainMsgProvider;
 
   /// settings from the user
   boost::shared_ptr<IEnggDiffractionSettings> m_mainSettings;
 
-  /// interface for the Python runner
-  boost::shared_ptr<IEnggDiffractionPythonRunner> m_mainPythonRunner;
+  boost::shared_ptr<IEnggDiffMultiRunFittingWidgetView> m_multiRunWidgetView;
 
   /// presenter as in the model-view-presenter
   boost::shared_ptr<IEnggDiffFittingPresenter> m_presenter;

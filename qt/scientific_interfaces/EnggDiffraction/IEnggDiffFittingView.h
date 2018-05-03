@@ -1,7 +1,7 @@
 #ifndef MANTIDQTCUSTOMINTERFACES_ENGGDIFFRACTION_IENGGDIFFFITTINGVIEW_H_
 #define MANTIDQTCUSTOMINTERFACES_ENGGDIFFRACTION_IENGGDIFFFITTINGVIEW_H_
 
-#include "IEnggDiffractionPythonRunner.h"
+#include "IEnggDiffMultiRunFittingWidgetOwner.h"
 #include "IEnggDiffractionSettings.h"
 #include "IEnggDiffractionUserMsg.h"
 
@@ -46,10 +46,13 @@ Code Documentation is available at: <http://doxygen.mantidproject.org>
 */
 class IEnggDiffFittingView : public IEnggDiffractionUserMsg,
                              public IEnggDiffractionSettings,
-                             public IEnggDiffractionPythonRunner {
+                             public IEnggDiffMultiRunFittingWidgetOwner {
 
 public:
   virtual ~IEnggDiffFittingView() = default;
+
+  virtual void
+  addWidget(IEnggDiffMultiRunFittingWidgetView *widget) override = 0;
 
   /**
    * Get value of the input files text box
@@ -80,41 +83,6 @@ public:
    * @param enable the button to Fit multi-run number
    */
   virtual void enableFitAllButton(bool enable) const = 0;
-
-  /**
-  * adds the run number to the list view widget on the interface
-  *
-  * @param runNo run number which needs to be added to
-  * the list widget
-  */
-  virtual void addRunNoItem(std::string runNo) = 0;
-
-  /**
-   * Deletes all items from the fitting list widget
-   */
-  virtual void clearFittingListWidget() const = 0;
-
-  /**
-   * Enables or disables the fitting list widget
-   *
-   * @param enable or disable the fitting list widget
-   */
-  virtual void enableFittingListWidget(bool enable) const = 0;
-
-  /**
-  * Gets the peak picker's center (d-spacing value)
-  *
-  * @return the peak picker's center value
-  */
-  virtual double getPeakCentre() const = 0;
-
-  /**
-  * Checks whether peak picker widget is enabled or no
-  *
-  * @return true or false according to the state of the
-  *  peak picker widget
-  */
-  virtual bool peakPickerEnabled() const = 0;
 
   /**
   * gets the previously used directory path by the user
@@ -148,35 +116,6 @@ public:
   * @return string of the saved file
   */
   virtual std::string getSaveFile(const std::string &prevPath) = 0;
-
-  /**
-   * @return idx of current selected row of list widget
-   */
-  virtual int getFittingListWidgetCurrentRow() const = 0;
-
-  /**
-  * Update the fitting list widget with a list of workspace run and bank numbers
-  */
-  virtual void
-  updateFittingListWidget(const std::vector<std::string> &rows) = 0;
-
-  /**
-  * @return The text on the current selected row of the list widget
-  */
-  virtual boost::optional<std::string>
-  getFittingListWidgetCurrentValue() const = 0;
-
-  /**
-  * @return Whether the list widget currently has an item selected
-  */
-  virtual bool listWidgetHasSelectedRow() const = 0;
-
-  /**
-   * Sets the current row of the fitting list widget
-   *
-   * @param idx number to set as for the list widget
-   */
-  virtual void setFittingListWidgetCurrentRow(int idx) const = 0;
 
   /**
    * Set value of the text box for input filenames
@@ -233,23 +172,6 @@ public:
   virtual void setFittingSingleRunMode(bool mode) = 0;
 
   /**
-   * generates and sets the curves on the fitting tab
-   *
-   * @param data of the workspace to be passed as QwtData
-   * @param focused to check whether focused workspace
-   * @param plotSinglePeaks whether to plot single peak fitting ws
-   * @param xAxisLabel Label specifying the x axis units
-   */
-  virtual void setDataVector(std::vector<boost::shared_ptr<QwtData>> &data,
-                             bool focused, bool plotSinglePeaks,
-                             const std::string &xAxisLabel) = 0;
-
-  /**
-   * resets the canvas to avoid multiple plotting
-   */
-  virtual void resetCanvas() = 0;
-
-  /**
    * Messages that this view wants to send to the logging system.
    *
    * @return list of messages to log, one by one.
@@ -271,11 +193,6 @@ public:
    * @param newInstrument the new instrument that is selected
    */
   virtual void setCurrentInstrument(const std::string &newInstrument) = 0;
-
-  /**
-  * Get whether the user has selected to plot reconstructed peaks over the run
-  */
-  virtual bool plotFittedPeaksEnabled() const = 0;
 };
 
 } // namespace CustomInterfaces

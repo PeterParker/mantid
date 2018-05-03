@@ -16,11 +16,18 @@ class MANTIDQT_ENGGDIFFRACTION_DLL EnggDiffFittingModel
     : public IEnggDiffFittingModel {
 
 public:
-  Mantid::API::MatrixWorkspace_sptr
-  getFocusedWorkspace(const RunLabel &runLabel) const override;
+  void addFilename(const RunLabel &runLabel,
+                   const std::string &filename) override;
+
+  void addFocusedRun(const RunLabel &runLabel,
+                     const Mantid::API::MatrixWorkspace_sptr ws) override;
 
   Mantid::API::MatrixWorkspace_sptr
-  getAlignedWorkspace(const RunLabel &runLabel) const override;
+  alignDetectors(const Mantid::API::MatrixWorkspace_sptr inputWS,
+                 const std::string &outputWSName) override;
+
+  Mantid::API::MatrixWorkspace_sptr
+  getFocusedWorkspace(const RunLabel &runLabel) const override;
 
   Mantid::API::MatrixWorkspace_sptr
   getFittedPeaksWS(const RunLabel &runLabel) const override;
@@ -33,23 +40,22 @@ public:
 
   void removeRun(const RunLabel &runLabel) override;
 
-  void loadWorkspaces(const std::string &filenames) override;
+  Mantid::API::MatrixWorkspace_sptr
+  loadWorkspace(const std::string &filename) override;
 
   std::vector<RunLabel> getRunLabels() const override;
 
   void
-  setDifcTzero(const RunLabel &runLabel,
+  setDifcTzero(Mantid::API::MatrixWorkspace_sptr ws, const RunLabel &runLabel,
                const std::vector<GSASCalibrationParms> &calibParams) override;
 
-  void enggFitPeaks(const RunLabel &runLabel,
-                    const std::string &expectedPeaks) override;
+  Mantid::API::MatrixWorkspace_sptr
+  enggFitPeaks(const RunLabel &runLabel,
+               const Mantid::API::MatrixWorkspace_sptr inputWS,
+               const std::string &expectedPeaks) override;
 
   void saveDiffFittingAscii(const RunLabel &runLabel,
                             const std::string &filename) const override;
-
-  void createFittedPeaksWS(const RunLabel &runLabel) override;
-
-  size_t getNumFocusedWorkspaces() const override;
 
   void addAllFitResultsToADS() const override;
 
@@ -58,10 +64,6 @@ public:
   bool hasFittedPeaksForRun(const RunLabel &runLabel) const override;
 
 protected:
-  void addFocusedWorkspace(const RunLabel &runLabel,
-                           const Mantid::API::MatrixWorkspace_sptr ws,
-                           const std::string &filename);
-
   void addFitResults(const RunLabel &runLabel,
                      const Mantid::API::ITableWorkspace_sptr ws);
 
@@ -81,7 +83,6 @@ private:
   RunMap<MAX_BANKS, std::string> m_wsFilenameMap;
   RunMap<MAX_BANKS, Mantid::API::ITableWorkspace_sptr> m_fitParamsMap;
   RunMap<MAX_BANKS, Mantid::API::MatrixWorkspace_sptr> m_fittedPeaksMap;
-  RunMap<MAX_BANKS, Mantid::API::MatrixWorkspace_sptr> m_alignedWorkspaceMap;
 
   std::string createFunctionString(
       const Mantid::API::ITableWorkspace_sptr fitFunctionParams,
@@ -90,6 +91,10 @@ private:
   std::pair<double, double> getStartAndEndXFromFitParams(
       const Mantid::API::ITableWorkspace_sptr fitFunctionParams,
       const size_t row);
+
+  Mantid::API::MatrixWorkspace_sptr
+  createFittedPeaksWS(const RunLabel &runLabel,
+                      const Mantid::API::MatrixWorkspace_sptr focusedWS);
 
   void evaluateFunction(const std::string &function,
                         const Mantid::API::MatrixWorkspace_sptr inputWS,
@@ -100,9 +105,10 @@ private:
                      const std::string &outputWSName, const int startWSIndex,
                      const int endWSIndex);
 
-  void rebinToFocusedWorkspace(const std::string &wsToRebinName,
-                               const RunLabel &runLabelToMatch,
-                               const std::string &outputWSName);
+  void
+  rebinToFocusedWorkspace(const std::string &wsToRebinName,
+                          const Mantid::API::MatrixWorkspace_sptr wsToMatch,
+                          const std::string &outputWSName);
 
   void cloneWorkspace(const Mantid::API::MatrixWorkspace_sptr inputWorkspace,
                       const std::string &outputWSName) const;
@@ -121,13 +127,9 @@ private:
 
   void convertFromDistribution(Mantid::API::MatrixWorkspace_sptr inputWS);
 
-  void alignDetectors(const std::string &inputWSName,
-                      const std::string &outputWSName);
-
-  void alignDetectors(Mantid::API::MatrixWorkspace_sptr inputWS,
-                      const std::string &outputWSName);
-
-  void loadWorkspace(const std::string &filename, const std::string &wsName);
+  Mantid::API::MatrixWorkspace_sptr
+  alignDetectors(const std::string &inputWSName,
+                 const std::string &outputWSName);
 
   void renameWorkspace(Mantid::API::Workspace_sptr inputWS,
                        const std::string &newName) const;

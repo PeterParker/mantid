@@ -2,6 +2,7 @@
 #define MANTIDQTCUSTOMINTERFACES_ENGGDIFFRACTION_ENGGDIFFFITTINGPRESENTER_H_
 
 #include "DllConfig.h"
+#include "IEnggDiffMultiRunFittingWidgetPresenter.h"
 #include "IEnggDiffFittingModel.h"
 #include "IEnggDiffFittingPresenter.h"
 #include "IEnggDiffFittingView.h"
@@ -56,7 +57,10 @@ public:
   EnggDiffFittingPresenter(
       IEnggDiffFittingView *view, std::unique_ptr<IEnggDiffFittingModel> model,
       boost::shared_ptr<IEnggDiffractionCalibration> mainCalib,
-      boost::shared_ptr<IEnggDiffractionParam> mainParam);
+      boost::shared_ptr<IEnggDiffractionParam> mainParam,
+      boost::shared_ptr<IEnggDiffMultiRunFittingWidgetPresenter>
+          multiRunWidget);
+
   ~EnggDiffFittingPresenter() override;
 
   void notify(IEnggDiffFittingPresenter::Notification notif) override;
@@ -86,8 +90,6 @@ protected:
   void processFitAllPeaks();
   void processShutDown();
   void processLogMsg();
-  void processUpdatePlotFitPeaks();
-  void processRemoveRun();
 
   /// clean shut down of model, view, etc.
   void cleanup();
@@ -97,7 +99,6 @@ protected slots:
   void fittingFinished();
 
 private:
-  void updatePlot();
 
   bool isDigit(const std::string &text) const;
 
@@ -136,6 +137,8 @@ private:
   /// interface for the 'current' calibration
   boost::shared_ptr<IEnggDiffractionParam> m_mainParam;
 
+  boost::shared_ptr<IEnggDiffMultiRunFittingWidgetPresenter> m_multiRunWidget;
+  
   /// Associated view for this presenter (MVP pattern)
   IEnggDiffFittingView *const m_view;
 

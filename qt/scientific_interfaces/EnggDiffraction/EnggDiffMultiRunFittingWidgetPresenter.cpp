@@ -72,13 +72,15 @@ void EnggDiffMultiRunFittingWidgetPresenter::addFittedPeaks(
   updatePlot(runLabel);
 }
 
-void EnggDiffMultiRunFittingWidgetPresenter::addFocusedRun(
+RunLabel EnggDiffMultiRunFittingWidgetPresenter::addFocusedRun(
     const Mantid::API::MatrixWorkspace_sptr ws) {
   const auto runNumber = ws->getRunNumber();
   const auto bankID = guessBankID(ws);
+  RunLabel runLabel(runNumber, bankID);
 
-  m_model->addFocusedRun(RunLabel(runNumber, bankID), ws);
+  m_model->addFocusedRun(runLabel, ws);
   m_view->updateRunList(m_model->getAllWorkspaceLabels());
+  return runLabel;
 }
 
 void EnggDiffMultiRunFittingWidgetPresenter::displayFitResults(
