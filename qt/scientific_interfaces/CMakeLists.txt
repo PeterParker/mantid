@@ -30,6 +30,7 @@ set ( TEST_FILES
   test/ALCLatestFileFinderTest.h
   test/ALCPeakFittingModelTest.h
   test/ALCPeakFittingPresenterTest.h
+  test/EnggDiffCalibrationModelTest.h
   test/EnggDiffGSASFittingModelTest.h
   test/EnggDiffGSASFittingPresenterTest.h
   test/EnggDiffMultiRunFittingWidgetModelTest.h
