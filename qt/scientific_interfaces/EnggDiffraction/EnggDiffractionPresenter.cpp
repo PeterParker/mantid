@@ -1139,10 +1139,10 @@ void EnggDiffractionPresenter::doCalib(const EnggDiffCalibSettings &cs,
                                        generalCalBankFilePath);
 
       m_calibrationModel->writeOutCalibFileSingleBank(
-          generalCalBankFilePath, m_currentCalibParms[bankID], bankName,
+          generalCalBankFilePath, m_currentCalibParms[bankID - 1], bankName,
           ceriaNo, vanNo);
       m_calibrationModel->writeOutCalibFileSingleBank(
-          userCalBankFilePath, m_currentCalibParms[bankID], bankName, ceriaNo,
+          userCalBankFilePath, m_currentCalibParms[bankID - 1], bankName, ceriaNo,
           vanNo);
     }
     m_calibrationModel->writeOutCalibFileAllBanks(
@@ -2316,7 +2316,7 @@ std::string EnggDiffractionPresenter::vanadiumCurvesPlotFactory() {
       "if(mtd.doesExist(van_curve_twin_ws)):\n"
       " DeleteWorkspace(van_curve_twin_ws)\n"
 
-      "CloneWorkspace(InputWorkspace = \"engggui_vanadium_curves_ws\", "
+      "CloneWorkspace(InputWorkspace = \"engggui_vanadium_curves\", "
       "OutputWorkspace = van_curve_twin_ws)\n"
 
       "van_curves_ws = workspace(van_curve_twin_ws)\n"
