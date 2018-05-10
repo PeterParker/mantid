@@ -55,13 +55,16 @@ std::string EnggDiffractionPresenter::g_lastValidRun = "";
 std::string EnggDiffractionPresenter::g_calibCropIdentifier = "SpectrumNumbers";
 std::string EnggDiffractionPresenter::g_sumOfFilesFocus = "";
 
-EnggDiffractionPresenter::EnggDiffractionPresenter(IEnggDiffractionView *view)
+EnggDiffractionPresenter::EnggDiffractionPresenter(
+    boost::shared_ptr<IEnggDiffractionView> view,
+    std::unique_ptr<IEnggDiffCalibrationModel> calibrationModel)
     : m_workerThread(nullptr), m_calibFinishedOK(false),
       m_focusFinishedOK(false), m_rebinningFinishedOK(false), m_view(view),
       m_viewHasClosed(false),
       m_vanadiumCorrectionsModel(
           boost::make_shared<EnggVanadiumCorrectionsModel>(
-              m_view->currentCalibSettings(), m_view->currentInstrument())) {
+              m_view->currentCalibSettings(), m_view->currentInstrument())),
+      m_calibrationModel(std::move(calibrationModel)) {
   if (!m_view) {
     throw std::runtime_error(
         "Severe inconsistency found. Presenter created "

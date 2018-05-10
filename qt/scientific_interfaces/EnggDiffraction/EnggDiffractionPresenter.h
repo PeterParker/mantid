@@ -5,6 +5,7 @@
 #include "MantidAPI/MatrixWorkspace_fwd.h"
 #include "MantidAPI/Workspace_fwd.h"
 #include "DllConfig.h"
+#include "IEnggDiffCalibrationModel.h"
 #include "IEnggDiffractionCalibration.h"
 #include "IEnggDiffractionParam.h"
 #include "IEnggDiffractionPresenter.h"
@@ -61,7 +62,9 @@ class MANTIDQT_ENGGDIFFRACTION_DLL EnggDiffractionPresenter
   Q_OBJECT
 
 public:
-  EnggDiffractionPresenter(IEnggDiffractionView *view);
+  EnggDiffractionPresenter(
+      boost::shared_ptr<IEnggDiffractionView> view,
+      std::unique_ptr<IEnggDiffCalibrationModel> calibrationModel);
   ~EnggDiffractionPresenter() override;
 
   void notify(IEnggDiffractionPresenter::Notification notif) override;
@@ -340,7 +343,7 @@ private:
   static int g_plottingCounter;
 
   /// Associated view for this presenter (MVP pattern)
-  IEnggDiffractionView *const m_view;
+  boost::shared_ptr<IEnggDiffractionView> m_view;
 
   /// Tracks if the view has started to shut down following a close signal
   bool m_viewHasClosed;
@@ -354,6 +357,8 @@ private:
   /// Model for calculating the vanadium corrections workspaces for focus and
   /// calib
   boost::shared_ptr<IEnggVanadiumCorrectionsModel> m_vanadiumCorrectionsModel;
+
+  std::unique_ptr<IEnggDiffCalibrationModel> m_calibrationModel;
 };
 
 } // namespace CustomInterfaces

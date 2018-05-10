@@ -1,4 +1,5 @@
 #include "EnggDiffractionViewQtGUI.h"
+#include "EnggDiffCalibrationModel.h"
 #include "EnggDiffractionPresenter.h"
 #include "MantidKernel/ConfigService.h"
 #include "MantidQtWidgets/Common/AlgorithmInputHistory.h"
@@ -65,10 +66,20 @@ void EnggDiffractionViewQtGUI::initLayout() {
   // setup container ui
   m_ui.setupUi(this);
 
+  // This is created from a QWidget* -> use null-deleter to prevent double-free
+  // with Qt
+  boost::shared_ptr<EnggDiffractionViewQtGUI> sharedView(
+      this, [](EnggDiffractionViewQtGUI *) {});
+
+  QComboBox *inst = m_ui.comboBox_instrument;
+  m_currentInst = inst->currentText().toStdString();
+
   // presenter that knows how to handle a IEnggDiffractionView should
   // take care of all the logic. Note that the view needs to know the
   // concrete presenter
-  auto fullPres = boost::make_shared<EnggDiffractionPresenter>(this);
+  auto fullPres = boost::make_shared<EnggDiffractionPresenter>(
+      sharedView, Mantid::Kernel::make_unique<EnggDiffCalibrationModel>(
+                      m_currentInst, sharedView));
   m_presenter = fullPres;
 
   // add tab contents and set up their ui's
@@ -84,10 +95,6 @@ void EnggDiffractionViewQtGUI::initLayout() {
   m_uiTabPreproc.setupUi(wPreproc);
   m_ui.tabMain->addTab(wPreproc, QString("Pre-processing"));
 
-  // This is created from a QWidget* -> use null-deleter to prevent double-free
-  // with Qt
-  boost::shared_ptr<EnggDiffractionViewQtGUI> sharedView(
-      this, [](EnggDiffractionViewQtGUI *) {});
   m_fittingWidget = new EnggDiffFittingViewQtWidget(
       m_ui.tabMain, sharedView, sharedView, fullPres, fullPres, sharedView);
   m_ui.tabMain->addTab(m_fittingWidget, QString("Fitting"));
@@ -99,9 +106,6 @@ void EnggDiffractionViewQtGUI::initLayout() {
   QWidget *wSettings = new QWidget(m_ui.tabMain);
   m_uiTabSettings.setupUi(wSettings);
   m_ui.tabMain->addTab(wSettings, QString("Settings"));
-
-  QComboBox *inst = m_ui.comboBox_instrument;
-  m_currentInst = inst->currentText().toStdString();
 
   setPrefix(m_currentInst);
   // An initial check on the RB number will enable the tabs after all
