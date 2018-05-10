@@ -11,19 +11,6 @@ std::string generateFitParamsTableName(const size_t bankID) {
   return "enggggui_calibration_bank_" + std::to_string(bankID);
 }
 
-std::string
-generateFitParamsTableName(const boost::optional<std::string> &bankName) {
-  if (!bankName) {
-    return "enggggui_calibration_bank_cropped";
-  }
-  if (*bankName == "North") {
-    return "engggui_calibration_bank_1";
-  }
-  if (*bankName == "South") {
-    return "engggui_calibration_bank_2";
-  }
-  return "engggui_calibration_bank_" + *bankName;
-}
 }
 
 namespace MantidQt {
@@ -82,8 +69,7 @@ EnggDiffCalibrationModel::DIFC_TZERO EnggDiffCalibrationModel::runEnggCalibrate(
 }
 
 EnggDiffCalibrationModel::DIFC_TZERO EnggDiffCalibrationModel::runEnggCalibrate(
-    const std::string &spectrumNumbers,
-    const boost::optional<std::string> &bankName,
+    const std::string &spectrumNumbers, const std::string &bankName,
     const Mantid::API::MatrixWorkspace_sptr calibrationSampleWS,
     const Mantid::API::MatrixWorkspace_sptr vanCurvesWS,
     const Mantid::API::ITableWorkspace_sptr vanIntegrationWS) const {
@@ -94,7 +80,7 @@ EnggDiffCalibrationModel::DIFC_TZERO EnggDiffCalibrationModel::runEnggCalibrate(
   alg->setProperty("VanCurvesWorkspace", vanCurvesWS);
   alg->setProperty("SpectrumNumbers", spectrumNumbers);
 
-  const auto fitParamsTableName = generateFitParamsTableName(bankName);
+  const auto fitParamsTableName = "enggggui_calibration_bank_" + bankName;
   alg->setPropertyValue("FittedPeaks", fitParamsTableName);
   alg->setPropertyValue("OutputParametersTableName", fitParamsTableName);
 

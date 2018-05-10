@@ -6,8 +6,6 @@
 #include "MantidAPI/ITableWorkspace_fwd.h"
 #include "MantidAPI/MatrixWorkspace_fwd.h"
 
-#include <boost/optional.hpp>
-
 #include <string>
 
 namespace MantidQt {
@@ -32,8 +30,7 @@ public:
       const Mantid::API::ITableWorkspace_sptr vanIntegrationWS) const = 0;
 
   virtual DIFC_TZERO runEnggCalibrate(
-      const std::string &spectrumNumbers,
-      const boost::optional<std::string> &bankName,
+      const std::string &spectrumNumbers, const std::string &bankName,
       const Mantid::API::MatrixWorkspace_sptr calibrationSampleWS,
       const Mantid::API::MatrixWorkspace_sptr vanCurvesWS,
       const Mantid::API::ITableWorkspace_sptr vanIntegrationWS) const = 0;

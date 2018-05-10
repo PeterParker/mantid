@@ -1066,170 +1066,107 @@ void EnggDiffractionPresenter::doCalib(const EnggDiffCalibSettings &cs,
                                        const std::string &ceriaNo,
                                        const std::string &outFilename,
                                        const std::string &specNos) {
-  MatrixWorkspace_sptr ceriaWS;
-
-  // Append current instrument name if numerical only entry
-  // to help Load algorithm determine instrument
-  std::string vanFileHint, cerFileHint;
-  appendCalibInstPrefix(vanNo, ceriaNo, vanFileHint, cerFileHint);
-
   // TODO: the settings tab should emit a signal when these are changed, on
   // which the vanadium corrections model should be updated automatically
   m_vanadiumCorrectionsModel->setCalibSettings(cs);
-  m_vanadiumCorrectionsModel->setCurrentInstrument(m_view->currentInstrument());
+  const auto &currentInst = m_view->currentInstrument();
+  m_vanadiumCorrectionsModel->setCurrentInstrument(currentInst);
+  m_calibrationModel->setInstrument(currentInst);
+
   const auto vanadiumCorrectionWorkspaces =
       m_vanadiumCorrectionsModel->fetchCorrectionWorkspaces(vanNo);
   const auto vanIntegWS = vanadiumCorrectionWorkspaces.first;
   const auto vanCurvesWS = vanadiumCorrectionWorkspaces.second;
 
-  try {
-    auto load = Mantid::API::AlgorithmManager::Instance().create("Load");
-    load->initialize();
-    load->setPropertyValue("Filename", cerFileHint);
-    const std::string ceriaWSName = "engggui_calibration_sample_ws";
-    load->setPropertyValue("OutputWorkspace", ceriaWSName);
-    load->execute();
-
-    AnalysisDataServiceImpl &ADS = Mantid::API::AnalysisDataService::Instance();
-    ceriaWS = ADS.retrieveWS<MatrixWorkspace>(ceriaWSName);
-  } catch (std::runtime_error &re) {
-    g_log.error()
-        << "Error while loading calibration sample data. "
-           "Could not run the algorithm Load succesfully for the "
-           "calibration "
-           "sample (run number: " +
-               ceriaNo + "). Error description: " + re.what() +
-               " Please check also the previous log messages for details.";
-    throw;
-  }
-
-  // Bank 1 and 2 - ENGIN-X
-  // bank 1 - loops once & used for cropped calibration
-  // bank 2 - loops twice, one with each bank & used for new calibration
-  std::vector<double> difc, tzero;
-  // for the names of the output files
-  std::vector<std::string> bankNames;
-
-  bool specNumUsed = specNos != "";
-  // TODO: this needs sanitizing, it should be simpler
-  if (specNumUsed) {
-    constexpr size_t bankNo1 = 1;
-
-    difc.resize(bankNo1);
-    tzero.resize(bankNo1);
-    int selection = m_view->currentCropCalibBankName();
-    if (0 == selection) {
-      // user selected "custom" name
-      const std::string customName = m_view->currentCalibCustomisedBankName();
-      if (customName.empty()) {
-        bankNames.emplace_back("cropped");
-      } else {
-        bankNames.push_back(customName);
-      }
-    } else if (1 == selection) {
-      bankNames.push_back("North");
-    } else {
-      bankNames.push_back("South");
-    }
-  } else {
-    constexpr size_t bankNo2 = 2;
-
-    difc.resize(bankNo2);
-    tzero.resize(bankNo2);
-    bankNames = {"North", "South"};
-  }
-
-  for (size_t i = 0; i < difc.size(); i++) {
-    auto alg =
-        Mantid::API::AlgorithmManager::Instance().create("EnggCalibrate");
-
-    alg->initialize();
-    alg->setProperty("InputWorkspace", ceriaWS);
-    alg->setProperty("VanIntegrationWorkspace", vanIntegWS);
-    alg->setProperty("VanCurvesWorkspace", vanCurvesWS);
-    if (specNumUsed) {
-      alg->setPropertyValue(g_calibCropIdentifier,
-                            boost::lexical_cast<std::string>(specNos));
-    } else {
-      alg->setPropertyValue("Bank", boost::lexical_cast<std::string>(i + 1));
-    }
-    const std::string outFitParamsTblName =
-        outFitParamsTblNameGenerator(specNos, i);
-    alg->setPropertyValue("FittedPeaks", outFitParamsTblName);
-    alg->setPropertyValue("OutputParametersTableName", outFitParamsTblName);
-    alg->execute();
-    if (!alg->isExecuted()) {
-      g_log.error() << "Error in calibration. ",
-          "Could not run the algorithm EnggCalibrate successfully for bank " +
-              boost::lexical_cast<std::string>(i);
-      throw std::runtime_error("EnggCalibrate failed");
-    }
-
-    difc[i] = alg->getProperty("DIFC");
-    tzero[i] = alg->getProperty("TZERO");
-
-    g_log.information() << " * Bank " << i + 1 << " calibrated, "
-                        << "difc: " << difc[i] << ", zero: " << tzero[i]
-                        << '\n';
-  }
-
-  // Creates appropriate output directory
-  const std::string calibrationComp = "Calibration";
-  const Poco::Path userCalSaveDir = outFilesUserDir(calibrationComp);
-  const Poco::Path generalCalSaveDir = outFilesGeneralDir(calibrationComp);
-
-  // Use poco to append filename so it is OS independent
-  std::string userCalFullPath =
-      appendToPath(userCalSaveDir.toString(), outFilename);
-  std::string generalCalFullPath =
-      appendToPath(generalCalSaveDir.toString(), outFilename);
-
-  // Double horror: 1st use a python script
-  // 2nd: because runPythonCode does this by emitting a signal that goes to
-  // MantidPlot, it has to be done in the view (which is a UserSubWindow).
-  // First write the all banks parameters file
-  m_calibFullPath = generalCalSaveDir.toString();
-  writeOutCalibFile(userCalFullPath, difc, tzero, bankNames, ceriaNo, vanNo);
-  writeOutCalibFile(generalCalFullPath, difc, tzero, bankNames, ceriaNo, vanNo);
+  const auto ceriaWS = m_calibrationModel->loadCalibrationSampleWS(ceriaNo);
 
   m_currentCalibParms.clear();
 
-  // Then write one individual file per bank, using different templates and the
-  // specific bank name as suffix
-  for (size_t bankIdx = 0; bankIdx < difc.size(); ++bankIdx) {
-    // Need to use van number not file name here else it will be
-    // "ENGINX_ENGINX12345_ENGINX12345...." as out name
-    const std::string bankFilename = buildCalibrateSuggestedFilename(
-        vanNo, ceriaNo, "bank_" + bankNames[bankIdx]);
+  const std::string calibrationComp = "Calibration";
+  const Poco::Path userCalSaveDir = outFilesUserDir(calibrationComp);
+  const Poco::Path generalCalSaveDir = outFilesGeneralDir(calibrationComp);
+  const auto userCalFullPath =
+      appendToPath(userCalSaveDir.toString(), outFilename);
+  const auto generalCalFullPath =
+      appendToPath(generalCalSaveDir.toString(), outFilename);
 
-    // Regenerate both full paths for each bank now
-    userCalFullPath = appendToPath(userCalSaveDir.toString(), bankFilename);
-    generalCalFullPath =
-        appendToPath(generalCalSaveDir.toString(), bankFilename);
-
-    std::string templateFile = "template_ENGINX_241391_236516_North_bank.prm";
-    if (1 == bankIdx) {
-      templateFile = "template_ENGINX_241391_236516_South_bank.prm";
+  if (specNos != "") {
+    // 0 for cropped, 1 for North, 2 for South
+    const int bankID = m_view->currentCropCalibBankName();
+    std::string bankName;
+    if (bankID == 0) {
+      const auto customName = m_view->currentCalibCustomisedBankName();
+      if (customName.empty()) {
+        bankName = "cropped";
+      } else {
+        bankName = customName;
+      }
+    } else if (bankID == 1) {
+      bankName = "North";
+    } else if (bankID == 2) {
+      bankName = "South";
+    } else {
+      throw std::invalid_argument(
+          "Encountered invalid bank ID when running cropped calibration: " +
+          std::to_string(bankID));
     }
+    const auto calibResults = m_calibrationModel->runEnggCalibrate(
+        specNos, bankName, ceriaWS, vanCurvesWS, vanIntegWS);
 
-    writeOutCalibFile(userCalFullPath, {difc[bankIdx]}, {tzero[bankIdx]},
-                      {bankNames[bankIdx]}, ceriaNo, vanNo, templateFile);
-    writeOutCalibFile(generalCalFullPath, {difc[bankIdx]}, {tzero[bankIdx]},
-                      {bankNames[bankIdx]}, ceriaNo, vanNo, templateFile);
+    m_currentCalibParms.emplace_back(bankID, calibResults.difc, 0,
+                                     calibResults.tzero, generalCalFullPath);
 
-    m_currentCalibParms.emplace_back(bankIdx, difc[bankIdx], 0.0,
-                                     tzero[bankIdx], generalCalFullPath);
-    if (1 == difc.size()) {
-      // it is a  single bank or cropped calibration, so take its specific name
-      m_calibFullPath = generalCalFullPath;
+    m_calibrationModel->writeOutCalibFileSingleBank(
+        userCalFullPath, m_currentCalibParms[0], bankName, ceriaNo, vanNo);
+    m_calibrationModel->writeOutCalibFileSingleBank(
+        generalCalFullPath, m_currentCalibParms[0], bankName, ceriaNo, vanNo);
+  } else {
+    const static std::vector<std::string> bankNames({"North", "South"});
+    for (size_t bankID = 1; bankID <= bankNames.size(); ++bankID) {
+      const auto &bankName = bankNames[bankID - 1];
+      const auto calibResults = m_calibrationModel->runEnggCalibrate(
+          bankID, ceriaWS, vanCurvesWS, vanIntegWS);
+      const std::string bankFilename =
+          buildCalibrateSuggestedFilename(vanNo, ceriaNo, "bank_" + bankName);
+
+      const auto generalCalBankFilePath =
+          appendToPath(generalCalSaveDir.toString(), bankFilename);
+      const auto userCalBankFilePath =
+          appendToPath(userCalSaveDir.toString(), bankFilename);
+
+      m_currentCalibParms.emplace_back(bankID, calibResults.difc, 0,
+                                       calibResults.tzero,
+                                       generalCalBankFilePath);
+
+      m_calibrationModel->writeOutCalibFileSingleBank(
+          generalCalBankFilePath, m_currentCalibParms[bankID], bankName,
+          ceriaNo, vanNo);
+      m_calibrationModel->writeOutCalibFileSingleBank(
+          userCalBankFilePath, m_currentCalibParms[bankID], bankName, ceriaNo,
+          vanNo);
     }
+    m_calibrationModel->writeOutCalibFileAllBanks(
+        userCalFullPath, m_currentCalibParms, ceriaNo, vanNo);
+    m_calibrationModel->writeOutCalibFileAllBanks(
+        generalCalFullPath, m_currentCalibParms, ceriaNo, vanNo);
   }
   g_log.notice() << "Calibration file written as " << generalCalFullPath << '\n'
                  << "And: " << userCalFullPath;
 
+  m_calibFullPath = generalCalFullPath;
+
   // plots the calibrated workspaces.
   g_plottingCounter++;
-  plotCalibWorkspace(difc, tzero, specNos);
+
+  // TODO: we probably don't need to do this any more, we should just be able to
+  // pass m_currentCalibParms to plotCalibWorkspace
+  std::vector<double> difcs;
+  std::vector<double> tzeros;
+  for (const auto &calibParam : m_currentCalibParms) {
+    difcs.push_back(calibParam.difc);
+    tzeros.push_back(calibParam.tzero);
+  }
+  plotCalibWorkspace(difcs, tzeros, specNos);
 }
 
 /**

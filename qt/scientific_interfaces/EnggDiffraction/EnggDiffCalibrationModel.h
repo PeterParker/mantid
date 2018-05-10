@@ -5,6 +5,8 @@
 #include "IEnggDiffCalibrationModel.h"
 #include "IEnggDiffractionPythonRunner.h"
 
+#include <boost/optional.hpp>
+
 namespace MantidQt {
 namespace CustomInterfaces {
 
@@ -25,8 +27,7 @@ public:
       const Mantid::API::ITableWorkspace_sptr vanIntegrationWS) const override;
 
   DIFC_TZERO runEnggCalibrate(
-      const std::string &spectrumNumbers,
-      const boost::optional<std::string> &bankName,
+      const std::string &spectrumNumbers, const std::string &bankName,
       const Mantid::API::MatrixWorkspace_sptr calibrationSampleWS,
       const Mantid::API::MatrixWorkspace_sptr vanCurvesWS,
       const Mantid::API::ITableWorkspace_sptr vanIntegrationWS) const override;
