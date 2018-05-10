@@ -8,7 +8,7 @@
 namespace {
 
 std::string generateFitParamsTableName(const size_t bankID) {
-  return "enggggui_calibration_bank_" + std::to_string(bankID);
+  return "engggui_calibration_bank_" + std::to_string(bankID);
 }
 
 }
