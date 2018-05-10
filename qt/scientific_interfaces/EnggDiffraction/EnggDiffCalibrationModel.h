@@ -31,7 +31,7 @@ public:
       const Mantid::API::MatrixWorkspace_sptr vanCurvesWS,
       const Mantid::API::ITableWorkspace_sptr vanIntegrationWS) const override;
 
-  void setInstrument(const std::string &instrumentName);
+  void setInstrument(const std::string &instrumentName) override;
 
   void writeOutCalibFileAllBanks(
       const std::string &filename,

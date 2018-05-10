@@ -38,6 +38,8 @@ public:
       const Mantid::API::MatrixWorkspace_sptr vanCurvesWS,
       const Mantid::API::ITableWorkspace_sptr vanIntegrationWS) const = 0;
 
+  virtual void setInstrument(const std::string &instrumentName) = 0;
+
   virtual void writeOutCalibFileAllBanks(
       const std::string &filename,
       const std::vector<GSASCalibrationParms> &calibParams,
