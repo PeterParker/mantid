@@ -8,9 +8,9 @@ from mantid.api import (AlgorithmFactory, DataProcessorAlgorithm, FileAction, In
                         WorkspaceProperty, WorkspaceUnitValidator)
 from mantid.kernel import (CompositeValidator, Direct, Direction, FloatBoundedValidator, IntBoundedValidator, IntArrayBoundedValidator,
                            IntMandatoryValidator, Property, StringListValidator, UnitConversion)
-from mantid.simpleapi import (AddSampleLog, CalculateFlatBackground, CloneWorkspace, CorrectTOFAxis, CreateEPP, CreateSingleValuedWorkspace,
-                              CreateWorkspace, CropWorkspace, DeleteWorkspace, Divide, ExtractMonitors, FindEPP, GetEiMonDet, Minus,
-                              NormaliseToMonitor, Scale, LoadAndMerge)
+from mantid.simpleapi import (AddSampleLog, CalculateFlatBackground, CloneWorkspace, ConjoinWorkspaces, CorrectTOFAxis, CreateEPP,
+                              CreateSingleValuedWorkspace, CreateWorkspace, CropWorkspace, DeleteWorkspace, Divide, ExtractMonitors,
+                              FindEPP, GetEiMonDet, Minus, NormaliseToMonitor, Scale, LoadAndMerge)
 import numpy
 
 
@@ -42,7 +42,7 @@ def _applyIncidentEnergyCalibration(ws, wsType, eiWS, wsNames, report,
                  LogText=str(wavelength),
                  LogType='Number',
                  NumberType='Double',
-                 LogUnit='Ångström',
+                 LogUnit='Angstrom',
                  EnableLogging=algorithmLogging)
     report.notice("Applied Ei calibration to '" + str(ws) + "'.")
     report.notice('Original Ei: {} new Ei: {}.'.format(originalEnergy, energy))
@@ -234,6 +234,73 @@ def _sumDetectorsAtDistance(ws, distance, tolerance):
                 continue
             ySums += ws.readY(i)
     return ySums
+
+
+def _wsWidePolynomialBkg(ws, peakStarts, peakEnds, wsNames, wsCleanup, algorithmLogging):
+    """Calculate a 2nd degree polynomial background over all histograms."""
+    def integrate(wsName, **kwargs):
+        """Integrate a workspace."""
+        bkgWSName = wsNames.withSuffix(wsName)
+        bkgWS = Integration(
+            InputWorkspace=ws,
+            OutputWorkspace=bkgWSName,
+            EnableLogging=algorithmLogging,
+            **kwargs)
+        return bkgWS
+    leftBkgWSName = wsNames.withSuffix('left_bkg_integrated')
+    leftBkgWS = integrate(leftBkgWSName, **{'RangeUpperList': peakStarts})
+    rightBkgWSName = wsNames.withSuffix('right_bkg_integrated')
+    rightBkgWS = integrate(rightBkgWSName, **{'RangeLowerList': peakEnds})
+    X = ws.extractX()
+    n = X.shape[0]
+    lenLeftBkg = numpy.empty(n)
+    lenRightBkg = numpy.empty(n)
+    for i in range(n):
+        lenLeftBkg[i] = numpy.searchsorted(X[i], peakStarts[i]) - 1
+        lenRightBkg[i] = X.shape[1] - numpy.searchsorted(X[i], peakEnds[i]) - 1
+    def average(ws, binCountWSName, averageWSName, binCounts):
+        """Average a workspace by number of bins."""
+        dummyPoints = numpy.zeros(n)
+        dummyErrors = numpy.ones(n)
+        binCountWS = CreateWorkspace(
+            OutputWorkspace=binCountWSName,
+            DataX=dummyPoints,
+            DataY=binCounts,
+            DataE=dummyErrors,
+            NSpec=n,
+            EnableLogging=algorithmLogging)
+        averageWS = Divide(
+            LHSWorkspace=ws,
+            RHSWorkspace=binCountWS,
+            OutputWorkspace=averageWSName,
+            EnableLogging=algorithmLoggin)
+        wsCleanup.cleanup(binCountWS)
+        return averageWS
+    leftBkgBinCountWSName = wsNames.withSuffix('left_bkg_bin_count')
+    averageLeftBkgWSName = wsNames.withSuffix('left_bkg_average')
+    averageLeftBkgWS = average(leftBkgWS, leftBkgBinCountWSName, averageLeftBkgWSName, lenLeftBkg)
+    wsCleanup.cleanup(leftBkgWS)
+    rightBkgBinCountWSName = wsNames.withSuffix('righ_bkg_bin_count')
+    averageLeftBkgWSName = wsNames.withSuffix('right_bkg_average')
+    averageRightBkgWS = average(rightBkgWS, rightBkgBinCountWSName, averageRightBkgWSName, lenRightBkg)
+    wsCleanup.cleanup(rightBkgWS)
+    bgkWSName = wsNames.withSuffix('bkg_average')
+    bkgWS = Sum(
+        LHSWorkspace=averageLeftBkgWS,
+        RHSWorkspace=averageRightBkgWS,
+        OutputWorkspce=bkgWSName,
+        EnableLogging=algorithmLogging)
+    bkgWS /= 2.
+    bkgWS = Transpose(bkgWS)
+    fittedBkgWSName = wsNames.withSuffix('bkg_fitted')
+    fittedBkgWS = CalculatePolynomialBackground(
+        InputWorkspace=bkgWS,
+        OutputWorkspace=fittedBkgWSName,
+        Degree=2,
+        EnableLogging=algorithmLogging)
+    wsCleanup.cleanup(bkgWS)
+    fittedBkgWS = Transpose(fittedBkgWS)
+    return fittedBkgWS
 
 
 class DirectILLCollectData(DataProcessorAlgorithm):
@@ -668,6 +735,8 @@ class DirectILLCollectData(DataProcessorAlgorithm):
         """Subtract flat background from a detector workspace."""
         if not self._flatBgkEnabled(mainWS, report):
             return mainWS, None
+        if mainWS.getInstrument().getName() == 'IN5':
+            return self._subtractComponentWideBkg(mainWS, wsNames, wsCleanup, subalgLogging)
         windowWidth = self.getProperty(common.PROP_FLAT_BKG_WINDOW).value
         if self.getProperty(common.PROP_FLAT_BKG_WS).isDefault:
             bkgWS = _createFlatBkg(mainWS, common.WS_CONTENT_DETS, windowWidth, wsNames, subalgLogging)
@@ -792,6 +861,65 @@ class DirectILLCollectData(DataProcessorAlgorithm):
                                        EnableLogging=subalgLogging)
         wsCleanup.cleanup(mainWS)
         return detWS, monWS
+
+    def _subtractComponentWideBkg(self, mainWS, wsNames, wsCleanup, subalgLogging):
+        """Subtract a polynomial background fitted over individual components."""
+        subtracgedWSName = wsNames.withSuffix('bkg_subtracted')
+        subtractedWS = CloneWorkspace(InputWorkspace=mainWS,
+                                      OutputWorkspace=subtractedWSName,
+                                      EnableLogging=subalgLogging)
+        wsCleanup.cleanup(mainWS)
+        bkgScaling = getProperty(PROP_FLAT_BKG_SCALING)
+        eppWSName = wsNames.withSuffix('epp_for_bkg')
+        eppWS = FindEPP(InputWorkspace=subtracteWS,
+                        OutputWorkspace=eppWSName,
+                        EnableLogging=subalgLogging)
+        centres = numpy.array(eppWS.column('PeakCentre'))
+        sigmaMultiplier = getProperty(PROP_BKG_SIGMA_MULTIPLIER).value
+        centreHalfWidth = sigmaMultiplier * numpy.array(eppWS.column('Sigma'))
+        fitStatuses = epps.column('FitStatus')
+        peakStarts = numpy.array(centres - centreHalfWidth)
+        peakEnds = numpy.array(centres + centreHalfWidth)
+        nPixels = mainwS.getNumberHistograms()
+        componentSize = mainWS.getInstrument().getIntParameter('pixels_per_component')[0]
+        if nPixels % componentSize != 0:
+            raise RuntimeError('Number of pixels does not match component size.')
+        nComponent = nPixels / componentSize
+        bkgWS = None
+        for i in range(nComponent):
+            pixelStart = componentSize * i
+            pixelEnd = pixelStart + componentSize
+            componentWS = CropWorkspace(
+                InputWorkspace=ws,
+                StartWorkspaceIndex=pixelStart,
+                EndWorkspaceIndex=pixelEnd - 1,
+                EnableLogging=subalgLogging
+            )
+            componentPeakStarts = peakStarts[pixelStart:pixelEnd]
+            componentPeakEnds = peakEnds[pixelStart:pixelEnd]
+            componentBkgWS = _wsWidePolynomialBkg(componentWS, componentPeakStarts, componentPeakEnds, wsNames, wsCleanup, subalgLogging)
+            wsCleanup.cleanup(componentWS)
+            if (bkgScaling != 1.):
+                componentBkgWS *= bkgScaling
+            for j in range(componentSize):
+                index = j + pixelStart
+                ys = subtractedWS.dataY(index)
+                es = subtractedWS.dataE(index)
+                ys -= componentBkgWS.readY(j)
+                bkgEs = componentBkgWS.readE(j)
+                es = numpy.sqrt(es * es + bkgEs * bkgEs)
+            if bkgWS is None:
+                bkgWS = comonentBkgWS
+                bkgWSName = wsNames.withSuffix('flat_bkg_for_detectors_scaled')
+                RenameWorkspace(InputWorkspace=bkgWS,
+                                OutputWorkspace=bkgWSName,
+                                EnableLogging=subalgLogging)
+            else:
+                ConjoinWorkspaces(InputWorkspace1=bkgWS,
+                                  InputWorkspace2=componentBkgWS,
+                                  EnableLogging=subalgLogging)            
+                wsCleanup.cleanup(componentBkgWS)
+        return subtractedWS, bkgWS
 
 
 AlgorithmFactory.subscribe(DirectILLCollectData)
